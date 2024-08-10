@@ -23,7 +23,7 @@ export interface TransactionRecord {
 export type Category = string;
 
 export function parseAmount(value: string): Amount {
-    const match = value.match(/^([^\d]+)([\d\s,.+]+)$/);
+    const match = value.match(/^([^\d]+)([\d\s,.+-]+)$/);
     if (!match) {
         throw new Error(`Invalid amount format: ${value}`);
     }
@@ -35,7 +35,8 @@ export function parseAmount(value: string): Amount {
 }
 
 export function parseAmountValue(value: string): number {
-    const parts = value.split("+").map((v:string) => parseNumber(v.trim()))
+    const parts = value.split(/(?=[+-])/). // 100+200-300 => ["100", "+200", "-300"]
+        map((v: string) => parseNumber(v.trim())) // ["100", "+200", "-300"] => [100, 200, -300]
 
     var result: number = 0
     for (const p of parts) {

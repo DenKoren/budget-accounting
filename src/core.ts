@@ -41,19 +41,14 @@ export async function addRecords(
     var currencies = db.currencies
     var lastTransaction = db.lastTransaction
 
-    var lastDate: Date | undefined
-    var lastCurrency: Currency | undefined
-    if (lastTransaction) {
-        lastDate = lastTransaction.date
-        lastCurrency = lastTransaction.commissions.currency
-    }
-
     if (lastTransaction) {
         logger.info("Last DB record is:\n\t" + formatTransactionRecord(lastTransaction))
     }
 
     while (true) {
-        const date = await askDate(lastDate);
+        const lastCurrency = lastTransaction?.commissions.currency
+
+        const date = await askDate(lastTransaction?.date);
         const opFrom = await askMoney("'src'", true, currencies, lastCurrency);
         const opTo = await askMoney("'dst'", opFrom !== undefined, currencies, opFrom?.currency ?? lastCurrency);
         const commissions = await askMoney('comission', true, currencies, opFrom?.currency ?? opTo!.currency);
@@ -72,5 +67,7 @@ export async function addRecords(
 
         db.addRecord(record)
         logger.info(`Transaction was added: ${formatTransactionRecord(record)}`);
+
+        lastTransaction = record
     }
 }
