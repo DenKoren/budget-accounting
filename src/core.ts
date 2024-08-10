@@ -48,6 +48,10 @@ export async function addRecords(
         lastCurrency = lastTransaction.commissions.currency
     }
 
+    if (lastTransaction) {
+        logger.info("Last DB record is:\n\t" + formatTransactionRecord(lastTransaction))
+    }
+
     while (true) {
         const date = await askDate(lastDate);
         const opFrom = await askMoney("'src'", true, currencies, lastCurrency);
