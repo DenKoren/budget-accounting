@@ -17,6 +17,17 @@ export function formatDate(date: Date): string {
     return `${year}.${month}.${day}`;
 }
 
+export function parseNumber(value: string): number {
+    const rawValue = value.replace(/\s/g, '').replace(',', '.');
+    const parsedValue = parseFloat(rawValue);
+
+    if (isNaN(parsedValue)) {
+        throw new Error(`Invalid number: ${rawValue}`);
+    }
+
+    return parsedValue
+}
+
 /* Number(1,000,000.00) -> String(1 000 000,00) */
 export function formatMoney(value: number): string {
     return value.toLocaleString('en-US', {

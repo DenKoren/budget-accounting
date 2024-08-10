@@ -1,4 +1,4 @@
-import { formatDate, formatMoney, parseDate } from "./utils";
+import { formatDate, formatMoney, parseDate, parseNumber } from "./utils";
 
 export type Currency = '$' | '€' | '₽';
 
@@ -23,7 +23,7 @@ export interface TransactionRecord {
 export type Category = string;
 
 export function parseAmount(value: string): Amount {
-    const match = value.match(/^([^\d]+)([\d\s,.]+)$/);
+    const match = value.match(/^([^\d]+)([\d\s,.+]+)$/);
     if (!match) {
         throw new Error(`Invalid amount format: ${value}`);
     }
@@ -35,14 +35,14 @@ export function parseAmount(value: string): Amount {
 }
 
 export function parseAmountValue(value: string): number {
-    const rawValue = value.replace(/\s/g, '').replace(',', '.');
-    const parsedValue = parseFloat(rawValue);
+    const parts = value.split("+").map((v:string) => parseNumber(v.trim()))
 
-    if (isNaN(parsedValue)) {
-        throw new Error(`Invalid amount value: ${rawValue}`);
+    var result: number = 0
+    for (const p of parts) {
+        result += p
     }
 
-    return parsedValue
+    return result
 }
 
 export function formatAmount(amount: Amount): string {
