@@ -1,0 +1,37 @@
+{
+    "name": "@denkoren/budget-accounting",
+    "version": "1.0.0",
+    "description": "CLI for working with simplest possible transactions DB in SCSV file",
+    "main": "core.ts",
+    "bin": {
+        "budget": "./bin/run.js"
+    },
+    "files": [
+        "bin/run.cmd",
+        "bin/run.js",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "test": "jest"
+    },
+    "dependencies": {
+        "@inquirer/prompts": "^5.3.8",
+        "@oclif/core": "^4.0.17",
+        "inquirer": "^10.1.8",
+        "winston": "^3.14.1"
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.12",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.2.4",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.5.4"
+    },
+    "oclif": {
+        "bin": "budget",
+        "commands": "./dist/commands",
+        "dirname": "budget-accounting",
+        "topicSeparator": " "
+    }
+}
