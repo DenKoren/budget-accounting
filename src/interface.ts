@@ -1,4 +1,4 @@
-import { input, select } from '@inquirer/prompts';
+import { input, select, search } from '@inquirer/prompts';
 import { Currency, Category, Amount, parseAmountValue, parseAmount, } from './model';
 import { formatDate, readPartialDate } from './utils';
 
@@ -51,9 +51,22 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
 }
 
 export async function askCategory(categories: Set<Category>): Promise<Category> {
-    const category = await select({
+    const category = await search({
         message: 'Choose a category:',
-        choices: Array.from(categories).sort().map((cat) => ({ name: cat, value: cat }))
+        source: (term: string | undefined) => {
+            const cats = Array.from(categories).sort()
+            if (!term) {
+                return cats.map((cat) => ({ name: cat, value: cat }))
+            }
+
+            return cats.
+                filter(
+                    (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
+                ).
+                map(
+                    (cat) => ({ name: cat, value: cat })
+                )
+        }
     });
 
     return category;
