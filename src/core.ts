@@ -1,7 +1,7 @@
 import winston from 'winston'
 import { Currency, formatTransactionRecord, TransactionRecord } from './model';
 import { DB } from './db';
-import { askDate, askMoney, askCategory, askComment } from './interface';
+import { askDate, askMoney, askAccounts, askCategory, askComment } from './interface';
 
 function dbFileName(name?: string): string {
     const now = new Date();
@@ -34,12 +34,15 @@ export async function addRecords(
         dbFile?: string
     },
 ) {
+    logger.info(`Opening DB file ${dbFileName(options?.dbFile)}`)
     const dbFile = dbFileName(options?.dbFile)
     const db = new DB(dbFile)
 
-    var categories = db.categories
-    var currencies = db.currencies
-    var lastTransaction = db.lastTransaction
+    const knownCategories = db.categories
+    const knownCurrencies = db.currencies
+    const knownAccounts = db.accounts
+    const knownComments = db.comments
+    let lastTransaction = db.lastTransaction
 
     if (lastTransaction) {
         logger.info("Last DB record is:\n\t" + formatTransactionRecord(lastTransaction))
@@ -49,11 +52,16 @@ export async function addRecords(
         const lastCurrency = lastTransaction?.commissions.currency
 
         const date = await askDate(lastTransaction?.date);
-        const opFrom = await askMoney("'src'", true, currencies, lastCurrency);
-        const opTo = await askMoney("'dst'", opFrom !== undefined, currencies, opFrom?.currency ?? lastCurrency);
-        const commissions = await askMoney('comission', true, currencies, opFrom?.currency ?? opTo!.currency);
-        const category = await askCategory(categories);
-        const comment = await askComment();
+        const opFrom = await askMoney("'src'", true, knownCurrencies, lastCurrency);
+        const opTo = await askMoney("'dst'", opFrom !== undefined, knownCurrencies, opFrom?.currency ?? lastCurrency);
+        const commissions = await askMoney('comission', true, knownCurrencies, opFrom?.currency ?? opTo!.currency);
+        const accounts = await askAccounts(knownAccounts);
+        const category = await askCategory(knownCategories);
+        const comment = await askComment(knownComments);
+
+        accounts.forEach(account => knownAccounts.add(account))
+        knownComments.add(comment)
+        knownCategories.add(category)
 
         const record: TransactionRecord = {
             date: date,
@@ -62,7 +70,9 @@ export async function addRecords(
                 currency: opFrom?.currency ?? opTo?.currency!,
                 value: 0
             },
-            category, comment
+            accounts: accounts,
+            category: category,
+            comment: comment
         };
 
         db.addRecord(record)

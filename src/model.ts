@@ -16,6 +16,7 @@ export interface TransactionRecord {
     date: Date;
     operation: Operation;
     commissions: Amount;
+    accounts: string[];
     category: Category;
     comment: string;
 }
@@ -68,17 +69,20 @@ export function formatOperation(operation: Operation): string {
 export function parseTransactionRecord(line: string): TransactionRecord {
     const fields = line.split(';');
 
-    if (fields.length !== 5 && (fields.length !== 6 || fields[5] !== "")) {
-        throw new Error(`incorrect number of fields: ${fields.length} instead of 5`)
+    if (fields.length !== 6 && (fields.length !== 7 || fields[6] !== "")) {
+        throw new Error(`incorrect number of fields: ${fields.length} instead of 6`)
     }
 
-    const [date, operationStr, commissionsStr, category, comment] = fields
+    const [date, operationStr, commissionsStr, accountsStr, category, comment] = fields
     const operation = parseOperation(operationStr);
     const commissions = parseAmount(commissionsStr);
+    const accounts = accountsStr.split(',').filter(account => account.trim() !== '');
+
     return {
         date: parseDate(date),
         operation: operation,
         commissions: commissions,
+        accounts: accounts,
         category: category.trim(),
         comment: comment.trim(),
     };
@@ -88,5 +92,6 @@ export function formatTransactionRecord(record: TransactionRecord): string {
     const date = formatDate(record.date);
     const operation = formatOperation(record.operation);
     const commissions = formatAmount(record.commissions);
-    return [date, operation, commissions, record.category, record.comment].join('; ').trim();
+    const accounts = record.accounts.join(',');
+    return [date, operation, commissions, accounts, record.category, record.comment].join('; ').trim();
 }

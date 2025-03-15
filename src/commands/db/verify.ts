@@ -4,7 +4,7 @@ import { verifyDB } from '../../core';
 import { createLogger } from '../../utils';
 
 export class Verify extends Command {
-    static description = 'Add a new transaction to the SCSV file';
+    static description = 'Just read and parse DB file';
 
     static flags = {
         ...cmdOpts.DBFlag,

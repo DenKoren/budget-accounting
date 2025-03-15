@@ -4,7 +4,7 @@ import { dumpDB } from '../../core';
 import { createLogger } from '../../utils';
 
 export class Dump extends Command {
-    static description = 'Add a new transaction to the SCSV file';
+    static description = 'Read all transactions from DB and write formatted results to stdout';
 
     static flags = {
         ...cmdOpts.DBFlag,

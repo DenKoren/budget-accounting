@@ -25,10 +25,28 @@ export async function askDate(lastTxDate?: Date): Promise<Date> {
 }
 
 export async function askMoney(fldName: string, allowEmpty: boolean, currencies: Set<Currency>, defaultCurrency?: Currency): Promise<Amount | undefined> {
-    const currency = await select({
+    const currency = await search({
         message: `${fldName} currency:`,
-        choices: Array.from(currencies).sort().map(currency => ({ name: currency, value: currency })),
-        default: defaultCurrency,
+        source: (term: string | undefined) => {
+            const vals = Array.from(currencies).sort()
+
+            if (defaultCurrency && vals.includes(defaultCurrency)) {
+                vals.splice(vals.indexOf(defaultCurrency), 1)
+                vals.unshift(defaultCurrency)
+            }
+
+            if (!term) {
+                return vals.map((v) => ({ name: v, value: v }))
+            }
+
+            const filtered = vals.filter(
+                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
+            )
+
+            return allowCustomValue(term, filtered).map(
+                (v) => ({ name: v, value: v })
+            )
+        }
     }) as Currency;
 
     const amount = await input({
@@ -50,6 +68,17 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
     return parseAmount(`${currency}${amount}`);
 }
 
+export async function askAccounts(accounts: Set<string>): Promise<string[]> {
+    const accountsStr = await input({
+        message: 'Enter the accounts involved to transaction:',
+        validate: (input: string) => {
+            return input.length > 0 || 'At least one account is required'
+        }
+    });
+
+    return accountsStr.split(',');
+}
+
 export async function askCategory(categories: Set<Category>): Promise<Category> {
     const category = await search({
         message: 'Choose a category:',
@@ -59,24 +88,45 @@ export async function askCategory(categories: Set<Category>): Promise<Category> 
                 return cats.map((cat) => ({ name: cat, value: cat }))
             }
 
-            return cats.
-                filter(
-                    (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
-                ).
-                map(
-                    (cat) => ({ name: cat, value: cat })
-                )
+            const filtered = cats.filter(
+                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
+            )
+
+            return allowCustomValue(term, filtered).map(
+                (cat) => ({ name: cat, value: cat })
+            )
         }
     });
 
     return category;
 }
 
-export async function askComment(): Promise<string> {
-    const comment = await input({
-        message: 'Enter a comment:',
-        validate: (input: string) => !input.includes(';') || 'Comment cannot contain a semicolon'
+export async function askComment(comments: Set<string>): Promise<string> {
+    const comment = await search({
+        message: 'Comment:',
+        source: (term: string | undefined) => {
+            const comms = Array.from(comments).sort()
+            if (!term) {
+                return comms.map((c) => ({ name: c, value: c }))
+            }
+
+            const filtered = comms.filter(
+                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
+            )
+
+            return allowCustomValue(term, filtered).map(
+                (val) => ({ name: val, value: val })
+            )
+        }
     });
 
     return comment;
+}
+
+function allowCustomValue(term: string, values: string[]) : string[] {
+    if (values.includes(term)) {
+        return values
+    }
+
+    return [term, ...values]
 }

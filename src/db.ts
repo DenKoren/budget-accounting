@@ -14,17 +14,20 @@ export class DB {
         const data = fs.readFileSync(this.filePath, 'utf8');
         const lines = data.trim().split('\n');
 
-        return lines.slice(1).map((line, lineNo) => {
+        const records =lines.slice(1).map((line, lineNo) => {
             try {
                 return parseTransactionRecord(line)
             } catch (e) {
                 throw new Error(`line ${lineNo+2}: ` + e)
             }
         });
+
+        records.sort((a, b) => a.date.getTime() - b.date.getTime());
+        return records;
     }
 
     private writeRecords(): void {
-        const header = 'Date; Operation; Commissions; Category; Comment';
+        const header = 'Date; Operation; Commissions; Accounts; Category; Comment';
         const lines = this._records.map(formatTransactionRecord)
         fs.writeFileSync(this.filePath, `${header}\n${lines.join('\n')}\n`);
     }
@@ -59,5 +62,17 @@ export class DB {
             }
         });
         return currencies;
+    }
+
+    public get accounts(): Set<string> {
+        const accounts = new Set<string>();
+        this._records.forEach(record => record.accounts.forEach(account => accounts.add(account)));
+        return accounts;
+    }
+
+    public get comments(): Set<string> {
+        const comments = new Set<string>();
+        this._records.forEach(record => comments.add(record.comment));
+        return comments;
     }
 }
