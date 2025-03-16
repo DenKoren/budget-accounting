@@ -1,4 +1,4 @@
-import { parseDate, readPartialDate } from './utils';
+import { parseDate, readPartialDate, smartSearch, searchWords, searchCapital } from './utils';
 
 describe('readPartialDate', () => {
     it('should format partial date with day only', () => {
@@ -25,3 +25,50 @@ describe('readPartialDate', () => {
         expect(() => readPartialDate('12.25')).toThrow();
     });
 });
+
+describe('smartSearch', () => {
+    it('should return all values if term is empty', () => {
+        expect(smartSearch('', ['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
+    });
+
+    it('should find by prefix', () => {
+        expect(smartSearch('aa', ['aaa', 'abb', 'acc'])).toEqual(['aaa']);
+    });
+
+    it('case insensitive', () => {
+        expect(smartSearch('a b c', ['aa bb cc', 'bb cc aa', 'cc bb aa'])).toEqual(['aa bb cc']);
+    });
+
+    it('prefix is preferred', () => {
+        expect(smartSearch('a b c', ['xa xb xc', 'a b c d'])).toEqual(['a b c d', 'xa xb xc']);
+    });
+})
+
+
+describe('searchWords', () => {
+    it('partial match works', () => {
+        expect(searchWords('a b c', 'aa bb cc')).toEqual(true);
+    });
+
+    it('order matters 2', () => {
+        expect(searchWords('a b c', 'bb cc aa')).toEqual(false);
+    });
+
+    it('any part of the word', () => {
+        expect(searchWords('a b c', 'beacon bubble crane')).toEqual(true);
+    });
+})
+
+describe('searchCapital', () => {
+    it('full abbreviation', () => {
+        expect(searchCapital('TIAT', 'ThisIsATest')).toEqual(true);
+    });
+
+    it('partial abbreviation', () => {
+        expect(searchCapital('TT', 'ThisIsATest')).toEqual(true);
+    });
+
+    it('order matters', () => {
+        expect(searchCapital('TAI', 'ThisIsATest')).toEqual(false);
+    });
+})

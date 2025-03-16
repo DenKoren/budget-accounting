@@ -106,3 +106,64 @@ export function createLogger(level: string = 'debug'): winston.Logger {
         ]
     });
 }
+
+export function allowCustomValue(term: string, values: string[]) : string[] {
+    const termLower = term.toLowerCase()
+
+    if (values.filter(
+        (v) => (v.toLowerCase() === termLower)
+    ).length === 1) {
+        return values
+    }
+
+    return [term, ...values]
+}
+
+export function smartSearch(term: string, values: string[]) : string[] {
+    if (!term) {
+        return values
+    }
+
+    let filtered = values.filter(
+        (v: string) => {
+            const vLower = v.toLowerCase();
+
+            return vLower.startsWith(term.toLowerCase()) ||
+                searchWords(term.toLowerCase(), vLower) ||
+                searchCapital(term, v)
+        }
+    )
+
+    const matchFromStart = filtered.filter(v => v.toLowerCase().startsWith(term!.toLowerCase()));
+    const allOtherFound = filtered.filter(v => !v.toLowerCase().startsWith(term!.toLowerCase()));
+
+    return [...matchFromStart, ...allOtherFound];
+}
+
+export function searchWords(term: string, value: string) : boolean {
+    const termWords = term.split(/\s+/);
+    let toProcess = value.split(/\s+/);
+
+    for (const searchWord of termWords) {
+        let indexFound = toProcess.findIndex(w => w.includes(searchWord));
+        if (indexFound === -1) {
+            return false
+        }
+
+        toProcess = toProcess.slice(indexFound+1)
+    }
+
+    return true
+}
+
+export function searchCapital(term: string, value: string): boolean {
+    const termParts = term.split(/(?=[A-Z]|\s)/).filter(p => p.trim());
+    let lastIndex = -1;
+
+    return termParts.every(part => {
+        const index = value.indexOf(part, lastIndex + 1);
+        if (index === -1) return false;
+        lastIndex = index;
+        return true;
+    });
+}

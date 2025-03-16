@@ -76,7 +76,7 @@ export function parseTransactionRecord(line: string): TransactionRecord {
     const [date, operationStr, commissionsStr, accountsStr, category, comment] = fields
     const operation = parseOperation(operationStr);
     const commissions = parseAmount(commissionsStr);
-    const accounts = accountsStr.split(',').filter(account => account.trim() !== '');
+    const accounts = accountsStr.split(',').map((v) => v.trim()).filter((v) => v);
 
     return {
         date: parseDate(date),

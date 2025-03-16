@@ -1,15 +1,15 @@
 import { input, select, search } from '@inquirer/prompts';
 import { Currency, Category, Amount, parseAmountValue, parseAmount, } from './model';
-import { formatDate, readPartialDate } from './utils';
+import * as utils from './utils';
 
 export async function askDate(lastTxDate?: Date): Promise<Date> {
-    const dateSuggest: string = lastTxDate ? formatDate(lastTxDate) : "YYYY.MM.DD"
+    const dateSuggest: string = lastTxDate ? utils.formatDate(lastTxDate) : "YYYY.MM.DD"
 
     const date = await input({
         message: `Enter the date [${dateSuggest}]:`,
         validate: (input: string) => {
             try {
-                readPartialDate(input, lastTxDate);
+                utils.readPartialDate(input, lastTxDate);
                 return true
 
             } catch (e) {
@@ -21,7 +21,7 @@ export async function askDate(lastTxDate?: Date): Promise<Date> {
         }
     });
 
-    return readPartialDate(date, lastTxDate)!;
+    return utils.readPartialDate(date, lastTxDate)!;
 }
 
 export async function askMoney(fldName: string, allowEmpty: boolean, currencies: Set<Currency>, defaultCurrency?: Currency): Promise<Amount | undefined> {
@@ -39,11 +39,8 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
                 return vals.map((v) => ({ name: v, value: v }))
             }
 
-            const filtered = vals.filter(
-                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
-            )
-
-            return allowCustomValue(term, filtered).map(
+            const filtered = utils.smartSearch(term, vals)
+            return utils.allowCustomValue(term, filtered).map(
                 (v) => ({ name: v, value: v })
             )
         }
@@ -69,10 +66,21 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
 }
 
 export async function askAccounts(accounts: Set<string>): Promise<string[]> {
-    const accountsStr = await input({
-        message: 'Enter the accounts involved to transaction:',
-        validate: (input: string) => {
-            return input.length > 0 || 'At least one account is required'
+    const accountsStr = await search({
+        message: 'Enter the accounts involved into transaction:',
+        source: (term: string | undefined) => {
+            const vals = Array.from(accounts).sort()
+
+            const termAccs = term?.split(',').map((v) => v.trim()) ?? []
+
+            const current = termAccs.pop() ?? ''
+            const prefix = termAccs.length > 0 ? termAccs.join(',') + ',' : ''
+
+            const found = utils.smartSearch(current, vals)
+
+            return utils.allowCustomValue(current, found).map(
+                (v) => ({ name: `${prefix}${v}`, value: `${prefix}${v}` })
+            )
         }
     });
 
@@ -83,17 +91,14 @@ export async function askCategory(categories: Set<Category>): Promise<Category> 
     const category = await search({
         message: 'Choose a category:',
         source: (term: string | undefined) => {
-            const cats = Array.from(categories).sort()
+            const vals = Array.from(categories).sort()
             if (!term) {
-                return cats.map((cat) => ({ name: cat, value: cat }))
+                return vals.map((v) => ({ name: v, value: v }))
             }
 
-            const filtered = cats.filter(
-                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
-            )
-
-            return allowCustomValue(term, filtered).map(
-                (cat) => ({ name: cat, value: cat })
+            const filtered = utils.smartSearch(term, vals)
+            return utils.allowCustomValue(term, filtered).map(
+                (v) => ({ name: v, value: v })
             )
         }
     });
@@ -105,28 +110,17 @@ export async function askComment(comments: Set<string>): Promise<string> {
     const comment = await search({
         message: 'Comment:',
         source: (term: string | undefined) => {
-            const comms = Array.from(comments).sort()
+            const vals = Array.from(comments).sort()
             if (!term) {
-                return comms.map((c) => ({ name: c, value: c }))
+                return vals.map((c) => ({ name: c, value: c }))
             }
 
-            const filtered = comms.filter(
-                (v: string) => v.toLowerCase().startsWith(term!.toLowerCase())
-            )
-
-            return allowCustomValue(term, filtered).map(
+            const filtered = utils.smartSearch(term ?? '', vals)
+            return utils.allowCustomValue(term, filtered).map(
                 (val) => ({ name: val, value: val })
             )
         }
     });
 
     return comment;
-}
-
-function allowCustomValue(term: string, values: string[]) : string[] {
-    if (values.includes(term)) {
-        return values
-    }
-
-    return [term, ...values]
 }

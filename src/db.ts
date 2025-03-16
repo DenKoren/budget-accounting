@@ -22,7 +22,11 @@ export class DB {
             }
         });
 
-        records.sort((a, b) => a.date.getTime() - b.date.getTime());
+        records.sort((a, b) => {
+            const dateCompare = a.date.getTime() - b.date.getTime();
+            if (dateCompare !== 0) return dateCompare;
+            return records.indexOf(a) - records.indexOf(b);
+        });
         return records;
     }
 
