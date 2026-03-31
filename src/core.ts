@@ -1,7 +1,8 @@
 import winston from 'winston'
-import { Currency, formatTransactionRecord, TransactionRecord, parseAmount } from './model';
+import { Currency, formatTransactionRecord, TransactionRecord, parseAmount, Amount } from './model';
 import { DB } from './db';
 import { askDate, askCurrency, askAmount, askAccounts, askCategory, askComment, CancelPromptError, ExitPromptError } from './interface';
+import { formatMoney } from './utils';
 
 function dbFileName(name?: string): string {
     const now = new Date();
@@ -113,4 +114,108 @@ export async function addRecords(
 
         lastTransaction = record
     }
+}
+
+type CurrencyTotals = Map<Currency, number>;
+
+interface CategoryStats {
+    in: CurrencyTotals;
+    out: CurrencyTotals;
+}
+
+interface AccountStats {
+    in: CurrencyTotals;
+    out: CurrencyTotals;
+    byCategory: Map<string, CategoryStats>;
+}
+
+function addToTotals(totals: CurrencyTotals, amount: Amount): void {
+    totals.set(amount.currency, (totals.get(amount.currency) ?? 0) + amount.value);
+}
+
+function formatTotals(totals: CurrencyTotals): string {
+    return Array.from(totals.entries())
+        .map(([currency, value]) => `${currency} ${formatMoney(value)}`)
+        .join('  ');
+}
+
+function balanceTotals(statsIn: CurrencyTotals, statsOut: CurrencyTotals): CurrencyTotals {
+    const balance: CurrencyTotals = new Map();
+    const currencies = new Set([...statsIn.keys(), ...statsOut.keys()]);
+    for (const c of currencies) {
+        balance.set(c, (statsIn.get(c) ?? 0) - (statsOut.get(c) ?? 0));
+    }
+    return balance;
+}
+
+export function reportDB(logger: winston.Logger,
+    options?: {
+        dbFile?: string
+    },
+): string[] {
+    const dbFile = dbFileName(options?.dbFile)
+    const db = new DB(dbFile)
+
+    const accounts = new Map<string, AccountStats>();
+
+    function getAccount(name: string): AccountStats {
+        let stats = accounts.get(name);
+        if (!stats) {
+            stats = { in: new Map(), out: new Map(), byCategory: new Map() };
+            accounts.set(name, stats);
+        }
+        return stats;
+    }
+
+    function getCategoryStats(account: AccountStats, category: string): CategoryStats {
+        let stats = account.byCategory.get(category);
+        if (!stats) {
+            stats = { in: new Map(), out: new Map() };
+            account.byCategory.set(category, stats);
+        }
+        return stats;
+    }
+
+    for (const record of db.records) {
+        const isIn = !record.operation.from && !!record.operation.to;
+        const isOut = !!record.operation.from && !record.operation.to;
+
+        for (const accountName of record.accounts) {
+            const account = getAccount(accountName);
+            const catStats = getCategoryStats(account, record.category);
+
+            if (isIn) {
+                addToTotals(account.in, record.operation.to!);
+                addToTotals(catStats.in, record.operation.to!);
+            } else if (isOut) {
+                addToTotals(account.out, record.operation.from!);
+                addToTotals(catStats.out, record.operation.from!);
+            }
+        }
+    }
+
+    const lines: string[] = [];
+
+    for (const [name, stats] of accounts) {
+        lines.push(`=== ${name} ===`);
+        lines.push(`  In:      ${formatTotals(stats.in) || '-'}`);
+        lines.push(`  Out:     ${formatTotals(stats.out) || '-'}`);
+        lines.push(`  Balance: ${formatTotals(balanceTotals(stats.in, stats.out)) || '-'}`);
+
+        if (stats.byCategory.size > 0) {
+            lines.push(`  By category:`);
+            for (const [category, catStats] of stats.byCategory) {
+                const parts: string[] = [];
+                const inStr = formatTotals(catStats.in);
+                const outStr = formatTotals(catStats.out);
+                if (inStr) parts.push(`in: ${inStr}`);
+                if (outStr) parts.push(`out: ${outStr}`);
+                lines.push(`    ${category}: ${parts.join('  ')}`);
+            }
+        }
+
+        lines.push('');
+    }
+
+    return lines;
 }
