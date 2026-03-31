@@ -1,9 +1,9 @@
 import { input, search } from '@inquirer/prompts';
-import { CancelPromptError } from '@inquirer/core';
+import { CancelPromptError, ExitPromptError } from '@inquirer/core';
 import { Currency, Category, parseAmountValue } from './model';
 import * as utils from './utils';
 
-export { CancelPromptError };
+export { CancelPromptError, ExitPromptError };
 
 type CancellablePromise<T> = Promise<T> & { cancel: () => void };
 

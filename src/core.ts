@@ -1,7 +1,7 @@
 import winston from 'winston'
 import { Currency, formatTransactionRecord, TransactionRecord, parseAmount } from './model';
 import { DB } from './db';
-import { askDate, askCurrency, askAmount, askAccounts, askCategory, askComment, CancelPromptError } from './interface';
+import { askDate, askCurrency, askAmount, askAccounts, askCategory, askComment, CancelPromptError, ExitPromptError } from './interface';
 
 function dbFileName(name?: string): string {
     const now = new Date();
@@ -80,6 +80,9 @@ export async function addRecords(
                 if (e instanceof CancelPromptError) {
                     if (i > 0) i--;
                     continue;
+                }
+                if (e instanceof ExitPromptError) {
+                    return;
                 }
                 throw e;
             }
