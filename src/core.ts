@@ -1,7 +1,7 @@
 import winston from 'winston'
-import { Currency, formatTransactionRecord, TransactionRecord } from './model';
+import { Currency, formatTransactionRecord, TransactionRecord, parseAmount } from './model';
 import { DB } from './db';
-import { askDate, askMoney, askAccounts, askCategory, askComment } from './interface';
+import { askDate, askCurrency, askAmount, askAccounts, askCategory, askComment, CancelPromptError } from './interface';
 
 function dbFileName(name?: string): string {
     const now = new Date();
@@ -28,6 +28,11 @@ export function dumpDB(logger: winston.Logger,
     return db.records.map(formatTransactionRecord)
 }
 
+interface Slot {
+    key: string;
+    ask: (results: Record<string, any>) => Promise<any>;
+}
+
 export async function addRecords(
     logger: winston.Logger,
     options?: {
@@ -51,28 +56,53 @@ export async function addRecords(
     while (true) {
         const lastCurrency = lastTransaction?.commissions.currency
 
-        const date = await askDate(lastTransaction?.date);
-        const opFrom = await askMoney("'src'", true, knownCurrencies, lastCurrency);
-        const opTo = await askMoney("'dst'", opFrom !== undefined, knownCurrencies, opFrom?.currency ?? lastCurrency);
-        const commissions = await askMoney('comission', true, knownCurrencies, opFrom?.currency ?? opTo!.currency);
-        const accounts = await askAccounts(knownAccounts);
-        const category = await askCategory(knownCategories);
-        const comment = await askComment(knownComments);
+        const slots: Slot[] = [
+            { key: 'date',         ask: ()  => askDate(lastTransaction?.date) },
+            { key: 'srcCurrency',  ask: ()  => askCurrency("'src'", knownCurrencies, lastCurrency) },
+            { key: 'srcAmount',    ask: ()  => askAmount("'src'", true) },
+            { key: 'dstCurrency',  ask: (r) => askCurrency("'dst'", knownCurrencies, r.srcAmount ? r.srcCurrency : lastCurrency) },
+            { key: 'dstAmount',    ask: (r) => askAmount("'dst'", r.srcAmount !== '') },
+            { key: 'commCurrency', ask: (r) => askCurrency("commission", knownCurrencies, r.srcAmount ? r.srcCurrency : r.dstCurrency) },
+            { key: 'commAmount',   ask: ()  => askAmount("commission", true) },
+            { key: 'accounts',     ask: ()  => askAccounts(knownAccounts) },
+            { key: 'category',     ask: ()  => askCategory(knownCategories) },
+            { key: 'comment',      ask: ()  => askComment(knownComments) },
+        ];
 
-        accounts.forEach(account => knownAccounts.add(account))
-        knownComments.add(comment)
-        knownCategories.add(category)
+        const results: Record<string, any> = {};
+        let i = 0;
+
+        while (i < slots.length) {
+            try {
+                results[slots[i].key] = await slots[i].ask(results);
+                i++;
+            } catch (e) {
+                if (e instanceof CancelPromptError) {
+                    if (i > 0) i--;
+                    continue;
+                }
+                throw e;
+            }
+        }
+
+        const opFrom = results.srcAmount ? parseAmount(`${results.srcCurrency}${results.srcAmount}`) : undefined;
+        const opTo = results.dstAmount ? parseAmount(`${results.dstCurrency}${results.dstAmount}`) : undefined;
+        const commissions = results.commAmount ? parseAmount(`${results.commCurrency}${results.commAmount}`) : undefined;
+
+        results.accounts.forEach((account: string) => knownAccounts.add(account))
+        knownComments.add(results.comment)
+        knownCategories.add(results.category)
 
         const record: TransactionRecord = {
-            date: date,
+            date: results.date,
             operation: { from: opFrom, to: opTo },
             commissions: commissions ?? {
-                currency: opFrom?.currency ?? opTo?.currency!,
+                currency: (opFrom?.currency ?? opTo?.currency) as Currency,
                 value: 0
             },
-            accounts: accounts,
-            category: category,
-            comment: comment
+            accounts: results.accounts,
+            category: results.category,
+            comment: results.comment,
         };
 
         db.addRecord(record)

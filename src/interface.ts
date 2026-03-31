@@ -1,11 +1,30 @@
-import { input, select, search } from '@inquirer/prompts';
-import { Currency, Category, Amount, parseAmountValue, parseAmount, } from './model';
+import { input, search } from '@inquirer/prompts';
+import { CancelPromptError } from '@inquirer/core';
+import { Currency, Category, parseAmountValue } from './model';
 import * as utils from './utils';
+
+export { CancelPromptError };
+
+type CancellablePromise<T> = Promise<T> & { cancel: () => void };
+
+function withEscapeBack<T>(promptPromise: CancellablePromise<T>): Promise<T> {
+    const onKeypress = (_input: string, key: { name: string }) => {
+        if (key && key.name === 'escape') {
+            promptPromise.cancel();
+        }
+    };
+
+    process.stdin.on('keypress', onKeypress);
+
+    return promptPromise.finally(() => {
+        process.stdin.removeListener('keypress', onKeypress);
+    });
+}
 
 export async function askDate(lastTxDate?: Date): Promise<Date> {
     const dateSuggest: string = lastTxDate ? utils.formatDate(lastTxDate) : "YYYY.MM.DD"
 
-    const date = await input({
+    const date = await withEscapeBack(input({
         message: `Enter the date [${dateSuggest}]:`,
         validate: (input: string) => {
             try {
@@ -19,13 +38,13 @@ export async function askDate(lastTxDate?: Date): Promise<Date> {
                 return JSON.stringify(e)
             }
         }
-    });
+    }));
 
     return utils.readPartialDate(date, lastTxDate)!;
 }
 
-export async function askMoney(fldName: string, allowEmpty: boolean, currencies: Set<Currency>, defaultCurrency?: Currency): Promise<Amount | undefined> {
-    const currency = await search({
+export async function askCurrency(fldName: string, currencies: Set<Currency>, defaultCurrency?: Currency): Promise<Currency> {
+    return await withEscapeBack(search({
         message: `${fldName} currency:`,
         source: (term: string | undefined) => {
             const vals = Array.from(currencies).sort()
@@ -44,9 +63,11 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
                 (v) => ({ name: v, value: v })
             )
         }
-    }) as Currency;
+    })) as Currency;
+}
 
-    const amount = await input({
+export async function askAmount(fldName: string, allowEmpty: boolean): Promise<string> {
+    return await withEscapeBack(input({
         message: `Enter the amount for ${fldName}:`,
         validate: (input: string) => {
             if (input === "") {
@@ -56,17 +77,11 @@ export async function askMoney(fldName: string, allowEmpty: boolean, currencies:
             parseAmountValue(input);
             return true
         }
-    });
-
-    if (amount === "") {
-        return undefined
-    }
-
-    return parseAmount(`${currency}${amount}`);
+    }));
 }
 
 export async function askAccounts(accounts: Set<string>): Promise<string[]> {
-    const accountsStr = await search({
+    const accountsStr = await withEscapeBack(search({
         message: 'Enter the accounts involved into transaction:',
         source: (term: string | undefined) => {
             const vals = Array.from(accounts).sort()
@@ -82,13 +97,13 @@ export async function askAccounts(accounts: Set<string>): Promise<string[]> {
                 (v) => ({ name: `${prefix}${v}`, value: `${prefix}${v}` })
             )
         }
-    });
+    }));
 
     return accountsStr.split(',');
 }
 
 export async function askCategory(categories: Set<Category>): Promise<Category> {
-    const category = await search({
+    return await withEscapeBack(search({
         message: 'Choose a category:',
         source: (term: string | undefined) => {
             const vals = Array.from(categories).sort()
@@ -101,13 +116,11 @@ export async function askCategory(categories: Set<Category>): Promise<Category> 
                 (v) => ({ name: v, value: v })
             )
         }
-    });
-
-    return category;
+    }));
 }
 
 export async function askComment(comments: Set<string>): Promise<string> {
-    const comment = await search({
+    return await withEscapeBack(search({
         message: 'Comment:',
         source: (term: string | undefined) => {
             const vals = Array.from(comments).sort()
@@ -120,7 +133,5 @@ export async function askComment(comments: Set<string>): Promise<string> {
                 (val) => ({ name: val, value: val })
             )
         }
-    });
-
-    return comment;
+    }));
 }
